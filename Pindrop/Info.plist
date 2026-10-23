@@ -35,9 +35,9 @@
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Pindrop uses on-device speech recognition to transcribe your audio without sending data to any server.</string>
 	<key>SUEnableAutomaticChecks</key>
-	<true/>
+	<false/>
 	<key>SUFeedURL</key>
-	<string>https://github.com/watzon/pindrop/releases/latest/download/appcast.xml</string>
+	<string>https://raw.githubusercontent.com/schroejahr2/pindrop/refs/heads/schroejahr/gpt-transcribe/fork-appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>TCU0MwULuIK6y0ubIossVr+61PGh/wHZfFrRFc9F2Is=</string>
 </dict>

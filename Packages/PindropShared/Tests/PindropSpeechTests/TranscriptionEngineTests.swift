@@ -118,6 +118,35 @@ struct TranscriptionEngineTests {
         #expect(body.contains("filename=\"audio.m4a\""))
     }
 
+    @Test func openAIEngineSendsLanguagesAndKeywordsForGPTTranscribe() async throws {
+        let session = OpenAITranscriptionSessionStub()
+        session.responseData = Data(#"{"text":"Cloud transcript","languages":[{"code":"de"}]}"#.utf8)
+        session.statusCode = 200
+        let engine = OpenAITranscriptionEngine(
+            apiKeyProvider: { "sk-test-key" },
+            session: session
+        )
+
+        try await engine.loadModel(name: "openai_gpt-transcribe", downloadBase: nil)
+        let transcript = try await engine.transcribe(
+            audioData: Data(count: 16_000 * MemoryLayout<Float>.size),
+            options: TranscriptionOptions(
+                language: .german,
+                vocabularyBiasWords: ["Pindrop", "<Whisper\nKit>", "pindrop", " "]
+            )
+        )
+
+        #expect(transcript == "Cloud transcript")
+        let body = String(decoding: try #require(session.lastRequest?.httpBody), as: UTF8.self)
+        #expect(body.contains("\r\n\r\ngpt-transcribe\r\n"))
+        #expect(body.contains("name=\"languages[]\"\r\n\r\nde\r\n"))
+        #expect(!body.contains("name=\"language\""))
+        #expect(body.contains("name=\"keywords[]\"\r\n\r\nPindrop\r\n"))
+        #expect(body.contains("name=\"keywords[]\"\r\n\r\nWhisperKit\r\n"))
+        #expect(body.components(separatedBy: "name=\"keywords[]\"").count == 3)
+        #expect(!body.contains("name=\"prompt\""))
+    }
+
     @Test func openAIEngineRequiresConfiguredAPIKey() async {
         let engine = OpenAITranscriptionEngine(apiKeyProvider: { "" })
 

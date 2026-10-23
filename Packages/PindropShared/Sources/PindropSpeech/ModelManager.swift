@@ -567,10 +567,21 @@ public final class ModelManager {
         
         // Cloud providers
         WhisperModel(
+            name: "openai_gpt-transcribe",
+            displayName: "OpenAI GPT Transcribe",
+            sizeInMB: 0,
+            description: "OpenAI's recommended model for accurate cloud transcription of recorded audio",
+            speedRating: 9.3,
+            accuracyRating: 9.9,
+            language: .multilingual,
+            provider: .openAI,
+            availability: .available
+        ),
+        WhisperModel(
             name: "openai_gpt-4o-mini-transcribe",
             displayName: "OpenAI GPT-4o Mini Transcribe",
             sizeInMB: 0,
-            description: "OpenAI's recommended model for fast, accurate cloud transcription",
+            description: "Fast, accurate cloud transcription (OpenAI retires it on 2027-02-26)",
             speedRating: 9.5,
             accuracyRating: 9.8,
             language: .multilingual,

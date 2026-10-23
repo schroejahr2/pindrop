@@ -67,9 +67,12 @@ public final class OpenAITranscriptionEngine: TranscriptionEngine {
     private static let maximumChunkDurationSeconds = 30 * 60
     private static let maximumUploadBytes = 25 * 1_024 * 1_024
     private static let modelIDs: [String: String] = [
+        "openai_gpt-transcribe": "gpt-transcribe",
         "openai_gpt-4o-transcribe": "gpt-4o-transcribe",
         "openai_gpt-4o-mini-transcribe": "gpt-4o-mini-transcribe"
     ]
+    /// Models that take `languages[]` and `keywords[]` instead of `language` and a vocabulary `prompt`.
+    nonisolated private static let contextFieldModelIDs: Set<String> = ["gpt-transcribe"]
 
     private let apiKeyProvider: @MainActor () throws -> String
     private let session: any OpenAITranscriptionSession
@@ -144,7 +147,8 @@ public final class OpenAITranscriptionEngine: TranscriptionEngine {
                     modelID: modelID,
                     apiKey: apiKey,
                     languageCode: options.language.whisperLanguageCode,
-                    prompt: prompt
+                    prompt: prompt,
+                    vocabularyWords: options.vocabularyBiasWords
                 )
                 let trimmed = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !trimmed.isEmpty {
@@ -181,7 +185,8 @@ public final class OpenAITranscriptionEngine: TranscriptionEngine {
         modelID: String,
         apiKey: String,
         languageCode: String?,
-        prompt: String?
+        prompt: String?,
+        vocabularyWords: [String]
     ) async throws -> String {
         let boundary = "Pindrop-\(UUID().uuidString)"
         var request = URLRequest(url: endpoint, timeoutInterval: 300)
@@ -193,6 +198,7 @@ public final class OpenAITranscriptionEngine: TranscriptionEngine {
             modelID: modelID,
             languageCode: languageCode,
             prompt: prompt,
+            vocabularyWords: vocabularyWords,
             audio: audio
         )
 
@@ -202,11 +208,12 @@ public final class OpenAITranscriptionEngine: TranscriptionEngine {
         }
 
         guard (200..<300).contains(httpResponse.statusCode) else {
-            let message = (try? JSONDecoder().decode(APIErrorEnvelope.self, from: data))?.error.message
+            let apiError = (try? JSONDecoder().decode(APIErrorEnvelope.self, from: data))?.error
+            let message = apiError?.message
                 ?? HTTPURLResponse.localizedString(forStatusCode: httpResponse.statusCode)
             let requestID = httpResponse.value(forHTTPHeaderField: "x-request-id") ?? "unavailable"
             Log.transcription.error(
-                "OpenAI transcription request failed status=\(httpResponse.statusCode) requestID=\(requestID)"
+                "OpenAI transcription request failed status=\(httpResponse.statusCode) requestID=\(requestID) code=\(apiError?.code ?? "none") type=\(apiError?.type ?? "none") message=\(message)"
             )
             throw EngineError.apiError(statusCode: httpResponse.statusCode, message: message)
         }
@@ -246,15 +253,27 @@ public final class OpenAITranscriptionEngine: TranscriptionEngine {
         modelID: String,
         languageCode: String?,
         prompt: String?,
+        vocabularyWords: [String],
         audio: Data
     ) -> Data {
         var body = Data()
         appendField(name: "model", value: modelID, boundary: boundary, to: &body)
-        if let languageCode {
-            appendField(name: "language", value: languageCode, boundary: boundary, to: &body)
-        }
-        if let prompt {
-            appendField(name: "prompt", value: prompt, boundary: boundary, to: &body)
+        if contextFieldModelIDs.contains(modelID) {
+            // gpt-transcribe replaces `language` with `languages[]` (never send both) and takes
+            // vocabulary as literal `keywords[]` rather than a comma-joined prompt.
+            if let languageCode {
+                appendField(name: "languages[]", value: languageCode, boundary: boundary, to: &body)
+            }
+            for keyword in keywords(from: vocabularyWords) {
+                appendField(name: "keywords[]", value: keyword, boundary: boundary, to: &body)
+            }
+        } else {
+            if let languageCode {
+                appendField(name: "language", value: languageCode, boundary: boundary, to: &body)
+            }
+            if let prompt {
+                appendField(name: "prompt", value: prompt, boundary: boundary, to: &body)
+            }
         }
 
         append("--\(boundary)\r\n", to: &body)
@@ -263,6 +282,17 @@ public final class OpenAITranscriptionEngine: TranscriptionEngine {
         body.append(audio)
         append("\r\n--\(boundary)--\r\n", to: &body)
         return body
+    }
+
+    /// OpenAI rejects the whole request when a keyword contains `<`, `>` or a line break.
+    nonisolated private static func keywords(from words: [String]) -> [String] {
+        var seen = Set<String>()
+        return words
+            .map { word in
+                String(word.unicodeScalars.filter { !"<>".unicodeScalars.contains($0) && !CharacterSet.newlines.contains($0) })
+                    .trimmingCharacters(in: .whitespaces)
+            }
+            .filter { !$0.isEmpty && seen.insert($0.lowercased()).inserted }
     }
 
     nonisolated private static func appendField(
@@ -460,6 +490,8 @@ private struct TranscriptionResponse: Decodable {
 private struct APIErrorEnvelope: Decodable {
     struct APIError: Decodable {
         let message: String
+        let type: String?
+        let code: String?
     }
 
     let error: APIError

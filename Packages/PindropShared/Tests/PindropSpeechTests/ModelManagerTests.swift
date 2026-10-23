@@ -43,6 +43,7 @@ struct ModelManagerTests {
         #expect(models.contains { $0.name == "openai_whisper-large-v2" })
         #expect(models.contains { $0.name == "distil-whisper_distil-large-v3" })
         #expect(models.contains { $0.name == "parakeet-tdt-0.6b-v2" })
+        #expect(models.contains { $0.name == "openai_gpt-transcribe" && $0.provider == .openAI })
         #expect(models.contains { $0.name == "openai_gpt-4o-transcribe" && $0.provider == .openAI })
         #expect(models.contains { $0.name == "openai_gpt-4o-mini-transcribe" && $0.provider == .openAI })
     }
@@ -120,6 +121,7 @@ struct ModelManagerTests {
     @Test func cloudModelsRequireNoLocalDownload() throws {
         let modelManager = try makeManager()
 
+        #expect(modelManager.isModelDownloaded("openai_gpt-transcribe"))
         #expect(modelManager.isModelDownloaded("openai_gpt-4o-transcribe"))
         #expect(modelManager.isModelDownloaded("openai_gpt-4o-mini-transcribe"))
     }

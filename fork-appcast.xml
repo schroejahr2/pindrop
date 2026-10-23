@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Empty Sparkle feed for the schroejahr2 fork. Upstream is archived and its
+     1.23.0 release lacks meeting notes, so this build must never update to it. -->
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Pindrop (schroejahr2 fork)</title>
+    <link>https://github.com/schroejahr2/pindrop</link>
+    <description>No updates are published for this fork.</description>
+    <language>en</language>
+  </channel>
+</rss>
