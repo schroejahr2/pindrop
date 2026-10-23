@@ -1275,7 +1275,12 @@ struct TranscriptionServiceTests {
             )
         }
 
-        try await Task.sleep(nanoseconds: 10_000_000)
+        // Cancel once diarization is running. A fixed 10 ms delay races engine loading on slow CI runners.
+        var waitedTicks = 0
+        while mockDiarizer.diarizeCallCount == 0 && waitedTicks < 200 {
+            try await Task.sleep(nanoseconds: 10_000_000)
+            waitedTicks += 1
+        }
         task.cancel()
 
         do {
